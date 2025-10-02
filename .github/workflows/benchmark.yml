@@ -1,0 +1,56 @@
+name: Macrobenchmark
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel older runs on the same branch/PR
+concurrency:
+  group: macrobench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: macos-13    # macOS runners boot Android emulators reliably
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Configure Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      # Boot a Google APIs emulator and run your connected tests against it
+      - name: Run macrobenchmark on emulator (API 31)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: true
+          emulator-boot-timeout: 1200
+          disable-animations: true
+          script: |
+            # Assemble the profileable, non-debuggable app variant once
+            ./gradlew :app:assembleBenchmark
+
+            # Run macrobenchmark tests (module is "benchmark" in this repo)
+            ./gradlew :benchmark:connectedAndroidTest --stacktrace
+
+      - name: Upload HTML reports & traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macrobenchmark-report
+          path: |
+            benchmark/build/reports/androidTests/**
+            benchmark/build/outputs/connected_android_test_additional_output/**
