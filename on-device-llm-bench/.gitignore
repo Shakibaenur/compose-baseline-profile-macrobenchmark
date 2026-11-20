@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+results/
+*.task
+*.litertlm
+.idea/
+.DS_Store
+._*
